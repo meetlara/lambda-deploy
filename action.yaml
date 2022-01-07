@@ -46,14 +46,11 @@ runs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ inputs.ecr_image_name }}
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
-        ECR_IMAGE_NAME: ${{ inputs.ecr_image_tag }}
+        ECR_IMAGE_NAME: ${{ inputs.ecr_image_name }}
       run: |
-        if docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME ; then
-            echo "Already existed image; skipping."
-        else
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME -f ./Dockerfile.serverless .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME 
-        fi
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME -f ./Dockerfile.serverless .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME 
+        
         for functionName in $FUNCTION_NAMES; do
           aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
         done
