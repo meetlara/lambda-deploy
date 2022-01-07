@@ -32,11 +32,13 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
     
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Build, tag, and push image to Amazon ECR and update function
       shell: bash
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ inputs.ecr_repository }}
+        FUNCTION_NAMES: ${{ inputs.lambda_names }}
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./app/Dockerfile.serverless ./app
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+        aws lambda update-function-code --function-name $FUNCTION_NAMES --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
