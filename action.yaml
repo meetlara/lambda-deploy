@@ -1,0 +1,57 @@
+name: Staging Deploy Docker Image for Lambdas on comments
+description: "Work only for PR comments"
+inputs:
+  match_comment_to_deploy:
+    description: String that will look for in the PR
+    required: false
+    default: '@meetlara/stg-lambda-deploy'
+  lambda_names:
+    description: Function names separated by comma
+    required: true
+  aws_access_key_id:
+    description: AWS Key ID
+    required: true
+  aws_secret_access_key:
+    description: AWS Secret Access Key
+    required: true
+  ecr_registry:
+    description: Define the name of the ECR image registry
+    required: true
+  ecr_repository:
+    description: Define the repository of the ECR image registry
+    required: true
+  image_tag:
+    description: Define the name of the tag you want to consolidate
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    
+    - name: Build, tag, and push image to Amazon ECR
+      shell: bash
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ inputs.ecr_registry }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f ./app/Dockerfile.serverless ./app
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          
+    - uses: craftech-io/slack-action@v1
+      with:
+        slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        slack_channel: deploy
+        slack_username: Github
+      if: always()
