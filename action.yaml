@@ -11,11 +11,15 @@ inputs:
     description: AWS Secret Access Key
     required: true
   ecr_image_name:
-    description: Define the repository of the ECR image
+    description: Define the repository of ECR image
+    required: true
+  ecr_image_tag:
+    description: Define the tag of ECR image
     required: true
   working_directory:
     description: Define the directory
     required: true
+  
   
 
 runs:
@@ -42,16 +46,16 @@ runs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ inputs.ecr_image_name }}
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
-        WORKING_DIRECTORY: ${{ inputs.working_directory }}
+        ECR_IMAGE_NAME: ${{ inputs.ecr_image_tag }}
       run: |
-        if docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA ; then
+        if docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME ; then
             echo "Already existed image; skipping."
         else
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./Dockerfile.serverless .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA 
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME -f ./Dockerfile.serverless .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME 
         fi
         for functionName in $FUNCTION_NAMES; do
           aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
         done
-        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" 
+        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME" 
         
