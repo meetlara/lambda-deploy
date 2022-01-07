@@ -10,9 +10,6 @@ inputs:
   aws_secret_access_key:
     description: AWS Secret Access Key
     required: true
-  ecr_registry:
-    description: Define the name of the ECR image registry
-    required: true
   ecr_repository:
     description: Define the repository of the ECR image registry
     required: true
