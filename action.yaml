@@ -39,7 +39,6 @@ runs:
     - name: Debug
       shell: bash
       id: debug
-      if: steps.check.outputs.triggered == 'true'
       run: |
         hub pr checkout ${{ github.event.issue.number }}
         echo "::set-output name=sha::$(git rev-parse HEAD)"
