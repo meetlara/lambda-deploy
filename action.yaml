@@ -1,10 +1,6 @@
-name: Staging Deploy Docker Image for Lambdas on comments
-description: "Work only for PR comments"
+name: Staging Deploy Docker Image for Lambdas
+description: "Build lambda image and deploy"
 inputs:
-  match_comment_to_deploy:
-    description: String that will look for in the PR
-    required: false
-    default: '@meetlara/stg-lambda-deploy'
   lambda_names:
     description: Function names separated by comma
     required: true
