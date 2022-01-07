@@ -10,11 +10,8 @@ inputs:
   aws_secret_access_key:
     description: AWS Secret Access Key
     required: true
-  ecr_repository:
-    description: Define the repository of the ECR image registry
-    required: true
-  image_tag:
-    description: Define the name of the tag you want to consolidate
+  ecr_image_name:
+    description: Define the repository of the ECR image
     required: true
 
 runs:
@@ -39,7 +36,7 @@ runs:
       shell: bash
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: ${{ inputs.ecr_repository }}
+        ECR_REPOSITORY: ${{ inputs.ecr_image_name }}
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./app/Dockerfile.serverless ./app
