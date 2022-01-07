@@ -44,10 +44,15 @@ runs:
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
         WORKING_DIRECTORY: ${{ inputs.working_directory }}
       run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./Dockerfile.serverless .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+        if docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA ; then
+            echo "Already existed image; skipping."
+        else
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./Dockerfile.serverless .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
         
-        for functionName in $FUNCTION_NAMES; do
-          aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
-        done 
+          for functionName in $FUNCTION_NAMES; do
+            aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+          done
+        fi
+        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" 
         
