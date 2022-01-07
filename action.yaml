@@ -45,6 +45,8 @@ runs:
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
         WORKING_DIRECTORY: ${{ inputs.working_directory }}
       run: |
+        echo ${WORKING_DIRECTORY}
+        pwd
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./Dockerfile.serverless .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
         
