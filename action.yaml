@@ -41,10 +41,3 @@ runs:
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f ./app/Dockerfile.serverless ./app
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          
-    - uses: craftech-io/slack-action@v1
-      with:
-        slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        slack_channel: deploy
-        slack_username: Github
-      if: always()
