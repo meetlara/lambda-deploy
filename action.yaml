@@ -13,6 +13,10 @@ inputs:
   ecr_image_name:
     description: Define the repository of the ECR image
     required: true
+  working_directory:
+    description: Define the directory
+    required: true
+  
 
 runs:
   using: "composite"
@@ -38,8 +42,9 @@ runs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ inputs.ecr_image_name }}
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
+        WORKING_DIRECTORY: ${{ inputs.working_directory }}
       run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./app/Dockerfile.serverless ./app
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./app/Dockerfile.serverless $WORKING_DIRECTORY
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
         
         for functionName in $FUNCTION_NAMES; do
