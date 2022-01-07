@@ -35,6 +35,17 @@ runs:
     
     - name: Setup Sam
       uses: aws-actions/setup-sam@v1
+    
+    - name: Checkout Pull Request
+      shell: bash
+      id: debug
+      if: steps.check.outputs.triggered == 'true'
+      run: |
+        hub pr checkout ${{ github.event.issue.number }}
+        echo "::set-output name=sha::$(git rev-parse HEAD)"
+        ls
+        echo ${inputs.working_directory}
+        echo $(pwd)
 
     - name: Build, tag, and push image to Amazon ECR and update function
       shell: bash
