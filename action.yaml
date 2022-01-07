@@ -32,6 +32,9 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
     
+    - name: Setup Sam
+      uses: aws-actions/setup-sam@v1
+
     - name: Build, tag, and push image to Amazon ECR and update function
       shell: bash
       env:
@@ -41,4 +44,8 @@ runs:
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -f ./app/Dockerfile.serverless ./app
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
-        aws lambda update-function-code --function-name $FUNCTION_NAMES --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+        
+        for functionName in $FUNCTION_NAMES; do
+          aws lambda update-function-code --function-name $lambdaName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+        done 
+        
