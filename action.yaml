@@ -21,7 +21,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v2
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -35,17 +34,7 @@ runs:
     
     - name: Setup Sam
       uses: aws-actions/setup-sam@v1
-    
-    - name: Debug
-      shell: bash
-      id: debug
-      run: |
-        hub pr checkout ${{ github.event.issue.number }}
-        echo "::set-output name=sha::$(git rev-parse HEAD)"
-        ls
-        echo ${inputs.working_directory}
-        echo $(pwd)
-
+  
     - name: Build, tag, and push image to Amazon ECR and update function
       shell: bash
       working-directory: ${{ inputs.working_directory }}
