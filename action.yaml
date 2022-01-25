@@ -51,7 +51,7 @@ runs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME -f ./Dockerfile.serverless .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME 
         for functionName in $FUNCTION_NAMES; do
-          aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+          aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
         done
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME" 
         
