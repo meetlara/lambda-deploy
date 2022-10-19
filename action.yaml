@@ -16,11 +16,13 @@ inputs:
   ecr_image_tag:
     description: Define the tag of ECR image
     required: true
-  working_directory:
-    description: Define the directory
+  build_working_directory:
+    description: Define the path of working directory of code to build Docker image
     required: true
-  
-  
+  docker_build_extra_args:
+    description: Define the extra arguments that you will set to docker build command
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -31,17 +33,17 @@ runs:
         aws-access-key-id: ${{ inputs.aws_access_key_id }}
         aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
         aws-region: us-east-1
-    
+
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
-    
+
     - name: Setup Sam
       uses: aws-actions/setup-sam@v1
-  
+
     - name: Build, tag, and push image to Amazon ECR and update function
       shell: bash
-      working-directory: ${{ inputs.working_directory }}
+      working-directory: ${{ inputs.build_working_directory }}
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ inputs.ecr_image_name }}
@@ -51,12 +53,11 @@ runs:
         if docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME ; then
             echo "Already existed image; skipping."
         else
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME -f ./Dockerfile.serverless .
+          docker build ${{ inputs.docker_build_extra_args }} -t $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME -f ./Dockerfile.serverless .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
         fi
-        
+
         for functionName in $FUNCTION_NAMES; do
           aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
         done
-        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME" 
-        
+        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME"
