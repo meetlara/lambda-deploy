@@ -53,8 +53,7 @@ runs:
       uses: aws-actions/amazon-ecr-login@v1
 
     - name: Setup Sam
-      uses: aws-actions/setup-sam@v1
-
+      uses: aws-actions/setup-sam@v2
     - name: Build, tag, and push image to Amazon ECR and update function
       shell: bash
       working-directory: ${{ inputs.build_working_directory }}
