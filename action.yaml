@@ -7,9 +7,6 @@ inputs:
   prefix_function_names:
     description: Function prefix to match
     required: true
-  prefix_function_names:
-    description: Function prefix to match
-    required: true
   aws_access_key_id:
     description: AWS Key ID
     required: true
