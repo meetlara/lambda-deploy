@@ -61,6 +61,7 @@ runs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ inputs.ecr_image_name }}
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
+        PREFIX_FUNCTION_NAMES: ${{ inputs.prefix_function_names }}
         ECR_IMAGE_NAME: ${{ inputs.ecr_image_tag }}
       run: |
         if docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME ; then
@@ -71,7 +72,9 @@ runs:
         fi
 
         if [ -z "${FUNCTION_NAMES}" ]; then
-          FUNCTIONS=$(aws lambda list-functions --query 'Functions[].FunctionName' --output json)
+
+          FUNCTIONS=$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '${PREFIX_FUNCTION_NAMES}')].FunctionName" --output json)
+          FUNCTIONS=$(aws lambda list-functions --query 'Functions[?starts_with(FunctionName, `${}`)].FunctionName' --output json)
           FUNCTIONS=$(echo $FUNCTIONS | tr -d '[]"')
 
           IFS=',' read -ra FUNCTION_ARRAY <<< "$FUNCTIONS"
