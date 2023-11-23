@@ -74,7 +74,6 @@ runs:
         if [ -z "${FUNCTION_NAMES}" ]; then
 
           FUNCTIONS=$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '${PREFIX_FUNCTION_NAMES}')].FunctionName" --output json)
-          FUNCTIONS=$(aws lambda list-functions --query 'Functions[?starts_with(FunctionName, `${}`)].FunctionName' --output json)
           FUNCTIONS=$(echo $FUNCTIONS | tr -d '[]"')
 
           IFS=',' read -ra FUNCTION_ARRAY <<< "$FUNCTIONS"
