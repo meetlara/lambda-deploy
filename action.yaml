@@ -2,7 +2,7 @@ name: Staging Deploy Docker Image for Lambdas
 description: "Build docker image, tag, upload and set on lambdas"
 inputs:
   lambda_names:
-    description: Function names separated by comma
+    description: Function names separated by space
     required: false
   prefix_function_names:
     description: Function prefix to match
