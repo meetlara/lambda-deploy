@@ -3,6 +3,12 @@ description: "Build docker image, tag, upload and set on lambdas"
 inputs:
   lambda_names:
     description: Function names separated by comma
+    required: false
+  prefix_function_names:
+    description: Function prefix to match
+    required: true
+  prefix_function_names:
+    description: Function prefix to match
     required: true
   aws_access_key_id:
     description: AWS Key ID
@@ -71,16 +77,13 @@ runs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
         fi
 
-        FUNCTION_LIST=$FUNCTION_NAMES
+        FUNCTION_LIST=$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '${PREFIX_FUNCTION_NAMES}')].FunctionName | @.join(' ', @)" --output text)
         if [ -z "${FUNCTION_NAMES}" ]; then
-          FUNCTIONS=$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '${PREFIX_FUNCTION_NAMES}')].FunctionName" --output json)
-          FUNCTIONS=$(echo $FUNCTIONS | tr -d '[]"')
-
-          IFS=',' read -ra FUNCTION_ARRAY <<< "$FUNCTIONS"
-          FUNCTION_LIST="${FUNCTION_ARRAY[@]}"
+          FUNCTION_LIST="$FUNCTION_LIST $AWS_FUNCTIONS"
         fi
 
         for functionName in $FUNCTION_LIST; do
           aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
         done
+        
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME"
