@@ -61,7 +61,6 @@ runs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ inputs.ecr_image_name }}
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
-        FUNCTIONS: ${{ env.FUNCTIONS }}
         ECR_IMAGE_NAME: ${{ inputs.ecr_image_tag }}
       run: |
         if docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME ; then
