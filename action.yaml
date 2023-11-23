@@ -71,18 +71,17 @@ runs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
         fi
 
+        FUNCTION_LIST=$FUNCTION_NAMES
         if [ -z "${FUNCTION_NAMES}" ]; then
-
           FUNCTIONS=$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '${PREFIX_FUNCTION_NAMES}')].FunctionName" --output json)
           FUNCTIONS=$(echo $FUNCTIONS | tr -d '[]"')
 
           IFS=',' read -ra FUNCTION_ARRAY <<< "$FUNCTIONS"
-          for functionName in "${FUNCTION_ARRAY[@]}"; do
-            aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
-          done
-        else
-          for functionName in $FUNCTION_NAMES; do
-            aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
-          done
+          FUNCTION_LIST="${FUNCTION_ARRAY[@]}"
         fi
+
+        for functionName in $FUNCTION_LIST; do
+          aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
+        done
+
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME"
