@@ -75,12 +75,11 @@ runs:
         fi
 
         FUNCTION_LIST=$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '${PREFIX_FUNCTION_NAMES}')].FunctionName | @.join(' ', @)" --output text)
-        if [ -z "${FUNCTION_NAMES}" ]; then
-          FUNCTION_LIST="$FUNCTION_LIST $AWS_FUNCTIONS"
+        if [ -n "${FUNCTION_NAMES}" ]; then
+          FUNCTION_LIST="$FUNCTION_LIST $FUNCTION_NAMES"
         fi
-
         for functionName in $FUNCTION_LIST; do
           aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME
         done
-        
+
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$ECR_IMAGE_NAME"
