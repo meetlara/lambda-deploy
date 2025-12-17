@@ -79,7 +79,7 @@ runs:
         IMAGE_NAME: ${{ inputs.ecr_image_name }}
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
         PREFIX_FUNCTION_NAMES: ${{ inputs.prefix_function_names }}
-        ECR_IMAGE_NAME: ${{ inputs.ecr_image_tag }}
+        IMAGE_TAG: ${{ inputs.ecr_image_tag }}
       run: |
         cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
         echo "Got latest docker image on repository. Tag: $cache_commit"
