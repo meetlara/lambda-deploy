@@ -26,24 +26,10 @@ inputs:
     description: Define the extra arguments that you will set to docker build command
     required: false
     default: ""
-  with_testing_db:
-    description: Wether is necessary a testing db or not
-    required: false
-    default: "false"
-  db_schemas:
-    description: DB schemas list to create separated by a space
-    required: false
 
 runs:
   using: "composite"
   steps:
-    - name: Set up test db
-      id: set-up-test-db
-      if: ${{ inputs.with_testing_db == 'true' }}
-      uses: meetlara/set-up-test-db@main
-      with:
-        db_schemas: ${{ inputs.db_schemas }}
-
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -57,16 +43,19 @@ runs:
       with:
         mask-password: 'false' # TODO: delete to change to 'true' by default (migration v1 to v2)
 
+    # Exposes ACTIONS_RUNTIME_TOKEN / ACTIONS_RESULTS_URL so the raw `docker buildx build`
+    # below can talk to the GitHub Actions cache (type=gha). Normal `run:` steps don't get
+    # these vars; a JS action does. We use first-party actions/github-script instead of a
+    # third-party action so the runtime token is never handed to an external dependency.
+    - name: Expose GitHub Actions runtime
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '')
+          core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '')
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
-
-    - name: Cache Docker layers
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-
 
     - name: Build, tag, and push image to Amazon ECR and update function
       shell: bash
@@ -77,6 +66,7 @@ runs:
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
         PREFIX_FUNCTION_NAMES: ${{ inputs.prefix_function_names }}
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
+        DOCKER_BUILD_EXTRA_ARGS: ${{ inputs.docker_build_extra_args }}
       run: |
         cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
         echo "Got latest docker image on repository. Tag: $cache_commit"
@@ -84,20 +74,29 @@ runs:
         if [ "$cache_commit" = "$IMAGE_TAG" ]; then
             echo "Already existed image; skipping."
         else
-          tmp_dir=" /tmp/ecs-deploy-$(date +%s)"
+          tmp_dir="/tmp/lambda-deploy-$(date +%s)"
           mkdir -p $tmp_dir;
-          
-          /usr/bin/docker buildx build --platform linux/amd64 --provenance=false --sbom=false --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new ${{ inputs.docker_build_extra_args }} --iidfile $tmp_dir/iidfile --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG --metadata-file $tmp_dir/metadata-file --push -f ./Dockerfile.serverless .
+
+          # GitHub Actions cache (type=gha). It's repo-scoped by GitHub, and we further
+          # scope by image name so multiple images in the same repo don't clobber each
+          # other. NOTE: mode=max intentionally omitted — it triggers a 400 error against
+          # the GHA cache backend (docker/buildx#841). Default mode=min caches the same
+          # layers here anyway since the Dockerfile is single-stage.
+          # --cache-from is guarded on ACTIONS_RESULTS_URL: a cache import error can be
+          # fatal to the build (moby/buildkit#2836), so we only attempt the import when
+          # the GHA cache runtime is actually available. Export stays best-effort via
+          # ignore-error. (IMAGE_NAME is an ECR repo name, no spaces, so it's safe unquoted.)
+          /usr/bin/docker buildx build \
+            --platform linux/amd64 --provenance=false --sbom=false \
+            ${ACTIONS_RESULTS_URL:+--cache-from type=gha,version=2,scope=$IMAGE_NAME} \
+            --cache-to "type=gha,version=2,scope=$IMAGE_NAME,ignore-error=true" \
+            $DOCKER_BUILD_EXTRA_ARGS \
+            --iidfile $tmp_dir/iidfile \
+            --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --metadata-file $tmp_dir/metadata-file \
+            --push -f ./Dockerfile.serverless .
 
           rm -rf $tmp_dir
-          
-          # This ugly bit is necessary if you don't want your cache to grow forever
-          # until it hits GitHub's limit of 5GB.
-          # Temp fix
-          # https://github.com/docker/build-push-action/issues/252
-          # https://github.com/moby/buildkit/issues/1896
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
         fi
 
         echo "image=$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
