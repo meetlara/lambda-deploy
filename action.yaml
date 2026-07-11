@@ -48,7 +48,7 @@ runs:
     # these vars; a JS action does. We use first-party actions/github-script instead of a
     # third-party action so the runtime token is never handed to an external dependency.
     - name: Expose GitHub Actions runtime
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         script: |
           core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '')
@@ -83,8 +83,8 @@ runs:
           # layers here anyway since the Dockerfile is single-stage.
           /usr/bin/docker buildx build \
             --platform linux/amd64 --provenance=false --sbom=false \
-            --cache-from "type=gha,scope=$IMAGE_NAME" \
-            --cache-to "type=gha,scope=$IMAGE_NAME,ignore-error=true" \
+            --cache-from "type=gha,version=2,scope=$IMAGE_NAME" \
+            --cache-to "type=gha,version=2,scope=$IMAGE_NAME,ignore-error=true" \
             ${{ inputs.docker_build_extra_args }} \
             --iidfile $tmp_dir/iidfile \
             --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
