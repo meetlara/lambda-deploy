@@ -26,24 +26,10 @@ inputs:
     description: Define the extra arguments that you will set to docker build command
     required: false
     default: ""
-  with_testing_db:
-    description: Wether is necessary a testing db or not
-    required: false
-    default: "false"
-  db_schemas:
-    description: DB schemas list to create separated by a space
-    required: false
 
 runs:
   using: "composite"
   steps:
-    - name: Set up test db
-      id: set-up-test-db
-      if: ${{ inputs.with_testing_db == 'true' }}
-      uses: meetlara/set-up-test-db@main
-      with:
-        db_schemas: ${{ inputs.db_schemas }}
-
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -93,11 +79,13 @@ runs:
 
           # GitHub Actions cache (type=gha). It's repo-scoped by GitHub, and we further
           # scope by image name so multiple images in the same repo don't clobber each
-          # other. mode=max caches intermediate stages too.
+          # other. NOTE: mode=max intentionally omitted — it triggers a 400 error against
+          # the GHA cache backend (docker/buildx#841). Default mode=min caches the same
+          # layers here anyway since the Dockerfile is single-stage.
           /usr/bin/docker buildx build \
             --platform linux/amd64 --provenance=false --sbom=false \
             --cache-from "type=gha,scope=$IMAGE_NAME" \
-            --cache-to "type=gha,mode=max,scope=$IMAGE_NAME,ignore-error=true" \
+            --cache-to "type=gha,scope=$IMAGE_NAME,ignore-error=true" \
             ${{ inputs.docker_build_extra_args }} \
             --iidfile $tmp_dir/iidfile \
             --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
