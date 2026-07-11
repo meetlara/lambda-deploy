@@ -66,6 +66,7 @@ runs:
         FUNCTION_NAMES: ${{ inputs.lambda_names }}
         PREFIX_FUNCTION_NAMES: ${{ inputs.prefix_function_names }}
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
+        DOCKER_BUILD_EXTRA_ARGS: ${{ inputs.docker_build_extra_args }}
       run: |
         cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
         echo "Got latest docker image on repository. Tag: $cache_commit"
@@ -89,7 +90,7 @@ runs:
             --platform linux/amd64 --provenance=false --sbom=false \
             ${ACTIONS_RESULTS_URL:+--cache-from type=gha,version=2,scope=$IMAGE_NAME} \
             --cache-to "type=gha,version=2,scope=$IMAGE_NAME,ignore-error=true" \
-            ${{ inputs.docker_build_extra_args }} \
+            $DOCKER_BUILD_EXTRA_ARGS \
             --iidfile $tmp_dir/iidfile \
             --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
             --metadata-file $tmp_dir/metadata-file \
