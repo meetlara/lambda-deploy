@@ -26,6 +26,15 @@ inputs:
     description: Define the extra arguments that you will set to docker build command
     required: false
     default: ""
+  force_rebuild:
+    description: >-
+      Rebuild even if an image for this commit already exists in ECR, and push it under
+      a `<tag>-rebuild-<run>` tag. Needed to pick up a patched base image (e.g. a
+      security round on lambda-nodejs) without pushing a dummy commit just to move the
+      SHA. Also forces `--pull` so the mutable base tag is re-resolved instead of
+      reusing the cached layer.
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -67,10 +76,27 @@ runs:
         PREFIX_FUNCTION_NAMES: ${{ inputs.prefix_function_names }}
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
         DOCKER_BUILD_EXTRA_ARGS: ${{ inputs.docker_build_extra_args }}
+        FORCE_REBUILD: ${{ inputs.force_rebuild }}
       run: |
-        cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
-        echo "Got latest docker image on repository. Tag: $cache_commit"
-        
+        # Tag actually pushed. Stays $IMAGE_TAG on the normal path; a forced rebuild gets
+        # its own tag because these ECR repos are created IMMUTABLE (see
+        # meetlara/terraform modules/ecr-lambdas), so re-pushing $IMAGE_TAG would fail
+        # with ImageTagAlreadyExistsException. The run id + attempt keeps it unique even
+        # across re-runs of the same workflow run.
+        PUSH_TAG="$IMAGE_TAG"
+
+        if [ "$FORCE_REBUILD" = "true" ]; then
+          # Skip the existing-tag lookup entirely: we know an image for this commit is
+          # already there, and we want a new one anyway. Used when the content changed
+          # underneath an unchanged commit SHA, i.e. a patched base image.
+          PUSH_TAG="$IMAGE_TAG-rebuild-$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
+          cache_commit=""
+          echo "force_rebuild=true; rebuilding as $PUSH_TAG"
+        else
+          cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
+          echo "Got latest docker image on repository. Tag: $cache_commit"
+        fi
+
         if [ "$cache_commit" = "$IMAGE_TAG" ]; then
             echo "Already existed image; skipping."
         else
@@ -86,25 +112,30 @@ runs:
           # fatal to the build (moby/buildkit#2836), so we only attempt the import when
           # the GHA cache runtime is actually available. Export stays best-effort via
           # ignore-error. (IMAGE_NAME is an ECR repo name, no spaces, so it's safe unquoted.)
+          # A forced rebuild exists to pick up a new base image, and the base is
+          # referenced by the mutable tag `lambda-nodejs:24`, so re-resolve it instead of
+          # trusting whatever digest the cache resolved last time.
+          [ "$FORCE_REBUILD" = "true" ] && PULL_FLAG=--pull || PULL_FLAG=
+
           /usr/bin/docker buildx build \
-            --platform linux/amd64 --provenance=false --sbom=false \
+            --platform linux/amd64 --provenance=false --sbom=false $PULL_FLAG \
             ${ACTIONS_RESULTS_URL:+--cache-from type=gha,version=2,scope=$IMAGE_NAME} \
             --cache-to "type=gha,version=2,scope=$IMAGE_NAME,ignore-error=true" \
             $DOCKER_BUILD_EXTRA_ARGS \
             --iidfile $tmp_dir/iidfile \
-            --tag $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/$IMAGE_NAME:$PUSH_TAG \
             --metadata-file $tmp_dir/metadata-file \
             --push -f ./Dockerfile.serverless .
 
           rm -rf $tmp_dir
         fi
 
-        echo "image=$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "image=$ECR_REGISTRY/$IMAGE_NAME:$PUSH_TAG" >> $GITHUB_OUTPUT
 
         FUNCTION_LIST=$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '${PREFIX_FUNCTION_NAMES}')].FunctionName | @.join(' ', @)" --output text)
         if [ -n "${FUNCTION_NAMES}" ]; then
           FUNCTION_LIST="$FUNCTION_LIST $FUNCTION_NAMES"
         fi
         for functionName in $FUNCTION_LIST; do
-          aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          aws lambda update-function-code --function-name $functionName --image-uri $ECR_REGISTRY/$IMAGE_NAME:$PUSH_TAG
         done
