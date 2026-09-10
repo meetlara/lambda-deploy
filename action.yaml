@@ -26,6 +26,14 @@ inputs:
     description: Define the extra arguments that you will set to docker build command
     required: false
     default: ""
+  force_rebuild:
+    description: >-
+      Rebuild and push the image even if an image with this tag already exists in ECR.
+      Needed to pick up a patched base image (e.g. a security round on lambda-nodejs)
+      without pushing a dummy commit just to move the SHA. Also forces `--pull` so the
+      mutable base tag is re-resolved instead of reusing the cached layer.
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -67,10 +75,19 @@ runs:
         PREFIX_FUNCTION_NAMES: ${{ inputs.prefix_function_names }}
         IMAGE_TAG: ${{ inputs.ecr_image_tag }}
         DOCKER_BUILD_EXTRA_ARGS: ${{ inputs.docker_build_extra_args }}
+        FORCE_REBUILD: ${{ inputs.force_rebuild }}
       run: |
-        cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
-        echo "Got latest docker image on repository. Tag: $cache_commit"
-        
+        if [ "$FORCE_REBUILD" = "true" ]; then
+          # Skip the existing-tag lookup entirely so the image is rebuilt and the tag
+          # overwritten in place. Used when the content changed underneath an unchanged
+          # commit SHA, i.e. a patched base image.
+          cache_commit=""
+          echo "force_rebuild=true; rebuilding even if the tag already exists."
+        else
+          cache_commit=$(aws ecr describe-images --repository-name $IMAGE_NAME --query "[imageDetails[?imageTags[0]=='$IMAGE_TAG'].imageTags[0]][] | [0]" --output=text)
+          echo "Got latest docker image on repository. Tag: $cache_commit"
+        fi
+
         if [ "$cache_commit" = "$IMAGE_TAG" ]; then
             echo "Already existed image; skipping."
         else
@@ -86,8 +103,13 @@ runs:
           # fatal to the build (moby/buildkit#2836), so we only attempt the import when
           # the GHA cache runtime is actually available. Export stays best-effort via
           # ignore-error. (IMAGE_NAME is an ECR repo name, no spaces, so it's safe unquoted.)
+          # A forced rebuild exists to pick up a new base image, and the base is
+          # referenced by the mutable tag `lambda-nodejs:24`, so re-resolve it instead of
+          # trusting whatever digest the cache resolved last time.
+          [ "$FORCE_REBUILD" = "true" ] && PULL_FLAG=--pull || PULL_FLAG=
+
           /usr/bin/docker buildx build \
-            --platform linux/amd64 --provenance=false --sbom=false \
+            --platform linux/amd64 --provenance=false --sbom=false $PULL_FLAG \
             ${ACTIONS_RESULTS_URL:+--cache-from type=gha,version=2,scope=$IMAGE_NAME} \
             --cache-to "type=gha,version=2,scope=$IMAGE_NAME,ignore-error=true" \
             $DOCKER_BUILD_EXTRA_ARGS \
